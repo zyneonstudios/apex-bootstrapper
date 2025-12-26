@@ -9,7 +9,7 @@ public class Main {
     private static String path = ".";
     private static File localMetaFile = null;
     private static boolean log = false;
-    private static boolean errorLog = true;
+    private static boolean errorLog = false;
     private static boolean frame = false;
 
     public static void main(String[] args) {
@@ -22,12 +22,17 @@ public class Main {
             apexBootstrapper.update();
             apexBootstrapper.hideFrame();
             apexBootstrapper.launch();
+        } else {
+            throw new RuntimeException("Please specify a valid URL and path to a local meta file. Launch with --help for more information.");
         }
     }
 
     private static void resolveData(String[] args) {
         for(int i = 0; i < args.length; ++i) {
             switch (args[i]) {
+                case "--nexus-app":
+                    initNexusApp();
+                    return;
                 case "--b-url":
                     url = args[i + 1];
                     break;
@@ -46,8 +51,28 @@ public class Main {
                 case "--b-frame":
                     frame = true;
                     break;
+                case "--help":
+                    System.out.println("Apex Bootstrapper Help:");
+                    System.out.println("--nexus-app              : Initialize with Nexus App settings.");
+                    System.out.println("--b-url <url>            : *Specify the URL for the bootstrapper metadata.");
+                    System.out.println("--b-path <path>          : Specify the local path for installation.");
+                    System.out.println("--b-file <file>          : *Specify the local metadata file.");
+                    System.out.println("--b-log                  : Enable logging.");
+                    System.out.println("--b-error                : Enable error logging.");
+                    System.out.println("--b-frame                : Show the bootstrapper frame.");
+                    System.exit(0);
+                    break;
             }
         }
+    }
+
+    private static void initNexusApp() {
+        url = "https://zyneonstudios.github.io/apex-metadata/nexus-app/bootstrapper-metadata.json";
+        path = ".";
+        localMetaFile = new File("bootstrapper-metadata.json");
+        log = true;
+        errorLog = true;
+        frame = true;
     }
 
     public static ApexBootstrapper getApexBootstrapper() {
