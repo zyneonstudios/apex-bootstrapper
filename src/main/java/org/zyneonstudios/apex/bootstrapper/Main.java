@@ -1,5 +1,8 @@
 package org.zyneonstudios.apex.bootstrapper;
 
+import com.formdev.flatlaf.FlatDarkLaf;
+import com.formdev.flatlaf.themes.FlatMacDarkLaf;
+import javax.swing.*;
 import java.io.File;
 
 public class Main {
@@ -14,9 +17,20 @@ public class Main {
 
     public static void main(String[] args) {
         resolveData(args);
+        if(url == null) {
+            initNexusApp();
+        }
         if(url != null && !url.isEmpty() && localMetaFile != null) {
             apexBootstrapper = new ApexBootstrapper(url, path, localMetaFile, args, log, errorLog);
             if(frame) {
+                try {
+                    FlatDarkLaf.setup();
+                    if(System.getProperty("os.name").toLowerCase().contains("mac")) {
+                        UIManager.setLookAndFeel(new FlatMacDarkLaf());
+                    } else {
+                        UIManager.setLookAndFeel(new FlatDarkLaf());
+                    }
+                } catch (Exception ignore) {}
                 apexBootstrapper.showFrame();
             }
             apexBootstrapper.update();
@@ -54,8 +68,9 @@ public class Main {
                 case "--help":
                     System.out.println("Apex Bootstrapper Help:");
                     System.out.println("--nexus-app              : Initialize with Nexus App settings.");
-                    System.out.println("--b-url <url>            : *Specify the URL for the bootstrapper metadata.");
                     System.out.println("--b-path <path>          : Specify the local path for installation.");
+                    System.out.println("Note: The following options are ignored if --nexus-app is specified.");
+                    System.out.println("--b-url <url>            : *Specify the URL for the bootstrapper metadata.");
                     System.out.println("--b-file <file>          : *Specify the local metadata file.");
                     System.out.println("--b-log                  : Enable logging.");
                     System.out.println("--b-error                : Enable error logging.");
@@ -68,7 +83,6 @@ public class Main {
 
     private static void initNexusApp() {
         url = "https://zyneonstudios.github.io/apex-metadata/nexus-app/bootstrapper-metadata.json";
-        path = ".";
         localMetaFile = new File("bootstrapper-metadata.json");
         log = true;
         errorLog = true;

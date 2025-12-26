@@ -6,14 +6,14 @@ import com.google.gson.JsonObject;
 
 import javax.swing.*;
 import java.awt.*;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 
 public class ApexBootstrapper implements Bootstrapper {
+
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private final String url;
     private final String path;
@@ -34,7 +34,7 @@ public class ApexBootstrapper implements Bootstrapper {
 
     private JFrame bootstrapperFrame = null;
 
-    public ApexBootstrapper(String url, String path, File localMetaDataFile, String[] args,boolean outputLogs, boolean outputErrors) {
+    public ApexBootstrapper(String url, String path, File localMetaDataFile, String[] args, boolean outputLogs, boolean outputErrors) {
         this.outputLogs = outputLogs;
         this.outputErrors = outputErrors;
         this.args = args;
@@ -44,17 +44,19 @@ public class ApexBootstrapper implements Bootstrapper {
             path = path.substring(0, path.length() - 1);
         }
         this.path = path;
-        if (new File(path).mkdirs()) {
+        File base = new File(path);
+        if (base.mkdirs()) {
             log("Created directory path (first launch): " + path);
         }
-        String data = getData(url);
-        if (data == null) {
+
+        String fetched = getData(url);
+        if (fetched == null) {
             log("No data found. Switching to offline mode.");
             this.json = "{}";
             this.offline = true;
         } else {
             log("Data found, fetching information...");
-            this.json = data;
+            this.json = fetched;
             this.offline = false;
         }
 
@@ -81,8 +83,8 @@ public class ApexBootstrapper implements Bootstrapper {
             forceUpdate = false;
         }
 
-        JsonObject jsonObject = new Gson().fromJson(data, JsonObject.class);
-        if(jsonObject == null) {
+        JsonObject jsonObject = GSON.fromJson(this.json, JsonObject.class);
+        if (jsonObject == null) {
             throw new NullPointerException("The data could not be parsed.");
         }
         if (jsonObject.has("version")) {
@@ -92,7 +94,7 @@ public class ApexBootstrapper implements Bootstrapper {
             latestVersion = currentVersion;
         }
 
-        this.name = jsonObject.get("name").getAsString();
+        this.name = jsonObject.has("name") ? jsonObject.get("name").getAsString() : "application";
 
         if (jsonObject.has("downloadUrl")) {
             executableUrl = jsonObject.get("downloadUrl").getAsString();
@@ -109,39 +111,36 @@ public class ApexBootstrapper implements Bootstrapper {
 
     private String getData(String urlString) {
         log("Fetching data from: " + urlString);
+        HttpURLConnection connection = null;
         try {
             URL url = new URI(urlString).toURL();
             String protocol = url.getProtocol();
 
             if ("http".equalsIgnoreCase(protocol) || "https".equalsIgnoreCase(protocol)) {
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("GET");
                 connection.setConnectTimeout(5000);
                 connection.setReadTimeout(10000);
+                connection.setRequestProperty("User-Agent", "ApexBootstrapper/1.0");
 
-                try {
-                    int code = connection.getResponseCode();
-                    if (code >= 200 && code < 300) {
-                        try (BufferedReader reader = new BufferedReader(
-                                new InputStreamReader(connection.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-                            StringBuilder response = new StringBuilder();
-                            String line;
-                            while ((line = reader.readLine()) != null) {
-                                response.append(line);
-                            }
-                            return response.toString();
+                int code = connection.getResponseCode();
+                if (code >= 200 && code < 300) {
+                    try (InputStream in = connection.getInputStream();
+                         BufferedReader reader = new BufferedReader(new InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8))) {
+                        StringBuilder response = new StringBuilder();
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            response.append(line);
                         }
-                    } else {
-                        logError("HTTP error: " + code + " - " + connection.getResponseMessage());
-                        return null;
+                        return response.toString();
                     }
-                } finally {
-                    connection.disconnect();
+                } else {
+                    logError("HTTP error: " + code + " - " + connection.getResponseMessage());
+                    return null;
                 }
             } else {
-                try (java.io.InputStream in = url.openStream();
-                     BufferedReader reader = new BufferedReader(
-                             new InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8))) {
+                try (InputStream in = url.openStream();
+                     BufferedReader reader = new BufferedReader(new InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8))) {
                     StringBuilder response = new StringBuilder();
                     String line;
                     while ((line = reader.readLine()) != null) {
@@ -153,22 +152,28 @@ public class ApexBootstrapper implements Bootstrapper {
         } catch (Exception e) {
             logError("Error fetching data from URL: " + e.getMessage());
             return null;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
         }
     }
 
     private JsonObject getLocalMetaData() {
         try {
             if (localMetaDataFile != null && localMetaDataFile.exists() && localMetaDataFile.isFile()) {
-                BufferedReader reader = new BufferedReader(new java.io.FileReader(localMetaDataFile));
-                StringBuilder content = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    content.append(line);
+                try (BufferedReader reader = new BufferedReader(new FileReader(localMetaDataFile))) {
+                    StringBuilder content = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        content.append(line);
+                    }
+                    JsonObject obj = GSON.fromJson(content.toString(), JsonObject.class);
+                    return obj != null ? obj : new JsonObject();
                 }
-                reader.close();
-                return new Gson().fromJson(content.toString(), JsonObject.class);
             } else {
-                throw new RuntimeException("No local meta data found. File does not exist.");
+                log("Local metadata file not found, using defaults.");
+                return new JsonObject();
             }
         } catch (Exception e) {
             logError("Error reading local metadata file: " + e.getMessage());
@@ -229,7 +234,9 @@ public class ApexBootstrapper implements Bootstrapper {
     @Override
     public boolean update() {
         if (!isOffline()) {
-            if (!new File(getExecutablePath()).exists() || forceUpdate || (!isLatest()&&autoUpdate)) {
+            if (!new File(getExecutablePath()).exists() || forceUpdate || (!isLatest() && autoUpdate)) {
+                label.setText("Updating to version " + latestVersion + "...");
+                label.setForeground(Color.white);
                 if (downloadExecutable()) {
                     if (updateVersion()) {
                         log("Update to version " + latestVersion + " completed successfully.");
@@ -244,7 +251,7 @@ public class ApexBootstrapper implements Bootstrapper {
                 }
             }
         }
-        log("Skipping update: " + (isOffline() ? "No connection with the update server." : "Latest version already installed."));
+        log("Skipping update: " + (isOffline() ? "No connection with the update server." : "Latest version already installed or updates are disabled."));
         return false;
     }
 
@@ -253,20 +260,28 @@ public class ApexBootstrapper implements Bootstrapper {
         if (localMetaData.has("installedVersion")) {
             localMetaData.remove("installedVersion");
         }
-        if(localMetaData.has("forceUpdate")) {
+        if (localMetaData.has("forceUpdate")) {
             localMetaData.remove("forceUpdate");
         }
-        if(!localMetaData.has("autoUpdate")) {
+        if (!localMetaData.has("autoUpdate")) {
             localMetaData.addProperty("autoUpdate", true);
         }
         localMetaData.addProperty("forceUpdate", false);
         localMetaData.addProperty("installedVersion", latestVersion);
         try {
-            java.io.FileWriter writer = new java.io.FileWriter(localMetaDataFile);
-            writer.write(new GsonBuilder().setPrettyPrinting().create().toJson(localMetaData));
-            writer.close();
-            log("Updated local metadata file with new version.");
-            return true;
+            if (localMetaDataFile != null) {
+                File parent = localMetaDataFile.getParentFile();
+                if (parent != null && !parent.exists()) {
+                    parent.mkdirs();
+                }
+                try (FileWriter writer = new FileWriter(localMetaDataFile)) {
+                    writer.write(GSON.toJson(localMetaData));
+                }
+                log("Updated local metadata file with new version.");
+                return true;
+            } else {
+                logError("Local metadata file reference is null.");
+            }
         } catch (Exception e) {
             logError("Error updating local metadata file: " + e.getMessage());
         }
@@ -274,56 +289,79 @@ public class ApexBootstrapper implements Bootstrapper {
     }
 
     private boolean downloadExecutable() {
-        String destinationPath = path + File.separator + "cache" + File.separator;
-        if(!new File(destinationPath).mkdirs()) {
-            for(File f : new File(destinationPath).listFiles()) {
-                if(f.isFile()&&f.getName().endsWith(".jar")&&f.getName().startsWith(name+"-v")) {
-                    if(!f.delete()) {
-                        logError("Failed to delete local old executable: " + f.getAbsolutePath());
+        File cacheDir = new File(path, "cache");
+        if (!cacheDir.exists()) {
+            if (!cacheDir.mkdirs()) {
+                logError("Failed to create cache directory: " + cacheDir.getAbsolutePath());
+                return false;
+            }
+        } else {
+            File[] files = cacheDir.listFiles();
+            if (files != null) {
+                for (File f : files) {
+                    if (f.isFile() && f.getName().endsWith(".jar") && f.getName().startsWith(name + "-v")) {
+                        if (!f.delete()) {
+                            logError("Failed to delete local old executable: " + f.getAbsolutePath());
+                        }
                     }
                 }
             }
         }
-        destinationPath = destinationPath + name + "-v" + latestVersion + ".jar";
 
-        log("Downloading executable from: " + executableUrl + " to: " + destinationPath);
+        File destination = new File(cacheDir, name + "-v" + latestVersion + ".jar");
+
+        log("Downloading executable from: " + executableUrl + " to: " + destination.getAbsolutePath());
+        HttpURLConnection connection = null;
         try {
-            if (new File(destinationPath).exists()) {
-                if (!new File(destinationPath).delete()) {
-                    logError("Failed to delete existing file at destination. Aborting download.");
-                    return false;
-                }
+            if (destination.exists() && !destination.delete()) {
+                logError("Failed to delete existing file at destination. Aborting download.");
+                return false;
             }
             URL url = new URI(executableUrl).toURL();
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-            java.io.FileOutputStream outputStream = new java.io.FileOutputStream(destinationPath);
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            while ((bytesRead = connection.getInputStream().read(buffer)) != -1) {
-                outputStream.write(buffer, 0, bytesRead);
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(20000);
+            connection.setRequestProperty("User-Agent", "ApexBootstrapper/1.0");
+
+            int code = connection.getResponseCode();
+            if (code < 200 || code >= 300) {
+                logError("HTTP error downloading executable: " + code + " - " + connection.getResponseMessage());
+                return false;
             }
-            outputStream.close();
-            reader.close();
-            connection.disconnect();
+
+            try (InputStream in = connection.getInputStream();
+                 FileOutputStream outputStream = new FileOutputStream(destination)) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+            }
             log("Download completed successfully.");
             return true;
         } catch (Exception e) {
             logError("Error downloading executable: " + e.getMessage());
             return false;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
         }
     }
 
     @Override
     public int launch() {
         String executablePath = getExecutablePath();
-        if(!new File(executablePath).exists()) {
+        if (!new File(executablePath).exists()) {
             logError("Executable not found at path: " + executablePath);
             return -1;
         }
         try {
-            ProcessBuilder processBuilder = new ProcessBuilder("java", "-jar", executablePath);
+            ProcessBuilder processBuilder = new ProcessBuilder();
+            processBuilder.command().add("java");
+            processBuilder.command().add("-jar");
+            processBuilder.command().add(executablePath);
             if (args != null) {
                 for (String arg : args) {
                     processBuilder.command().add(arg);
@@ -331,9 +369,9 @@ public class ApexBootstrapper implements Bootstrapper {
             }
             processBuilder.inheritIO();
             Process process = processBuilder.start();
-            log("Launching "+executablePath+"...");
+            log("Launching " + executablePath + "...");
             int exitCode = process.waitFor();
-            if(exitCode == -2) {
+            if (exitCode == -2) {
                 return launch();
             }
             return exitCode;
@@ -361,29 +399,38 @@ public class ApexBootstrapper implements Bootstrapper {
         }
     }
 
+    private final JLabel label = new JLabel("Checking for updates...");
+
     public void showFrame() {
-
-
-
-         if(bootstrapperFrame == null) {
-             bootstrapperFrame = new JFrame("Apex Bootstrapper");
-             JProgressBar progressBar = new JProgressBar();
-             progressBar.setIndeterminate(true);
-             bootstrapperFrame.setLayout(new BorderLayout());
-             bootstrapperFrame.add(new JLabel("Checking for updates..."), BorderLayout.CENTER);
-             bootstrapperFrame.add(progressBar, BorderLayout.SOUTH);
-             bootstrapperFrame.setSize(400, 150);
-             bootstrapperFrame.setResizable(false);
-             bootstrapperFrame.setLocationRelativeTo(null);
-             bootstrapperFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-             bootstrapperFrame.setVisible(true);
-         } else {
-             bootstrapperFrame.setVisible(true);
-         }
+        if (bootstrapperFrame == null) {
+            bootstrapperFrame = new JFrame("Apex Bootstrapper");
+            bootstrapperFrame.getRootPane().putClientProperty("JRootPane.titleBarBackground", Color.black);
+            bootstrapperFrame.getRootPane().putClientProperty("JRootPane.titleBarForeground", Color.white);
+            bootstrapperFrame.getRootPane().setBackground(Color.black);
+            bootstrapperFrame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+            JProgressBar progressBar = new JProgressBar();
+            progressBar.setIndeterminate(true);
+            JPanel panel = new JPanel();
+            panel.setBackground(null);
+            panel.setLayout(new BorderLayout());
+            bootstrapperFrame.setLayout(new BorderLayout());
+            label.setBorder(BorderFactory.createEmptyBorder(0, 0, 4, 0));
+            label.setForeground(Color.white);
+            panel.add(label, BorderLayout.CENTER);
+            panel.add(progressBar, BorderLayout.SOUTH);
+            bootstrapperFrame.add(panel, BorderLayout.CENTER);
+            panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+            bootstrapperFrame.setSize(350, 100);
+            bootstrapperFrame.setResizable(false);
+            bootstrapperFrame.setLocationRelativeTo(null);
+            bootstrapperFrame.setVisible(true);
+        } else {
+            bootstrapperFrame.setVisible(true);
+        }
     }
 
     public void hideFrame() {
-        if(bootstrapperFrame != null) {
+        if (bootstrapperFrame != null) {
             bootstrapperFrame.setVisible(false);
             bootstrapperFrame.dispose();
             bootstrapperFrame = null;
