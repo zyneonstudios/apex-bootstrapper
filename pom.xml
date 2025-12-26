@@ -6,7 +6,7 @@
 
     <groupId>org.zyneonstudios.apex</groupId>
     <artifactId>bootstrapper</artifactId>
-    <version>2026.1-SNAPSHOT.4</version>
+    <version>26.1-pre.1</version>
 
     <dependencies>
         <dependency>

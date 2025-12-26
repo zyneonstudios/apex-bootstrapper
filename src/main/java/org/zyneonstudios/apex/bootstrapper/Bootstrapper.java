@@ -33,6 +33,12 @@ public interface Bootstrapper {
     String getPath();
 
     /**
+     * Gets the name of the desired project.
+     * @return String projectName
+     */
+    String getName();
+
+    /**
      * Checks if the current version equals the latest version.
      * @return boolean isLatest
      */

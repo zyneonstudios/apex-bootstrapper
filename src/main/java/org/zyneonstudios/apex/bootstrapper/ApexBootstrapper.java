@@ -34,6 +34,14 @@ public class ApexBootstrapper implements Bootstrapper {
 
     private JFrame bootstrapperFrame = null;
 
+    public ApexBootstrapper(String url) {
+        this(url,".",new File("./bootstrapper-meta.json"),new String[0],true,true);
+    }
+
+    public ApexBootstrapper(String url, String[] args) {
+        this(url,".",new File("./bootstrapper-meta.json"),args,true,true);
+    }
+
     public ApexBootstrapper(String url, String path, File localMetaDataFile, String[] args, boolean outputLogs, boolean outputErrors) {
         this.outputLogs = outputLogs;
         this.outputErrors = outputErrors;
@@ -260,6 +268,7 @@ public class ApexBootstrapper implements Bootstrapper {
         return false;
     }
 
+    @SuppressWarnings("all")
     private boolean updateVersion() {
         currentVersion = latestVersion;
         if (localMetaData.has("installedVersion")) {
@@ -274,8 +283,8 @@ public class ApexBootstrapper implements Bootstrapper {
         if (localMetaData.has("installedProduct")) {
             localMetaData.remove("installedProduct");
         }
-        localMetaData.addProperty("installedProduct", name);
         localMetaData.addProperty("forceUpdate", false);
+        localMetaData.addProperty("installedProduct", name);
         localMetaData.addProperty("installedVersion", latestVersion);
         try {
             if (localMetaDataFile != null) {
@@ -447,6 +456,7 @@ public class ApexBootstrapper implements Bootstrapper {
         }
     }
 
+    @Override
     public String getName() {
         return name;
     }
