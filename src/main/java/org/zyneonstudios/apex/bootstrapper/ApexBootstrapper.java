@@ -77,6 +77,11 @@ public class ApexBootstrapper implements Bootstrapper {
             autoUpdate = true;
         }
 
+        String productName = "application";
+        if(localMetaData.has("name")) {
+            productName = localMetaData.get("name").getAsString();
+        }
+
         if (localMetaData.has("forceUpdate")) {
             forceUpdate = localMetaData.get("forceUpdate").getAsBoolean();
         } else {
@@ -94,7 +99,7 @@ public class ApexBootstrapper implements Bootstrapper {
             latestVersion = currentVersion;
         }
 
-        this.name = jsonObject.has("name") ? jsonObject.get("name").getAsString() : "application";
+        this.name = jsonObject.has("name") ? jsonObject.get("name").getAsString() : productName;
 
         if (jsonObject.has("downloadUrl")) {
             executableUrl = jsonObject.get("downloadUrl").getAsString();
@@ -266,6 +271,10 @@ public class ApexBootstrapper implements Bootstrapper {
         if (!localMetaData.has("autoUpdate")) {
             localMetaData.addProperty("autoUpdate", true);
         }
+        if (localMetaData.has("productName")) {
+            localMetaData.remove("productName");
+        }
+        localMetaData.addProperty("productName", name);
         localMetaData.addProperty("forceUpdate", false);
         localMetaData.addProperty("installedVersion", latestVersion);
         try {

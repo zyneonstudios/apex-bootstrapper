@@ -17,9 +17,12 @@ public class Main {
 
     public static void main(String[] args) {
         resolveData(args);
+
+        //Temporary fallback to Nexus App settings
         if(url == null) {
             initNexusApp();
         }
+
         if(url != null && !url.isEmpty() && localMetaFile != null) {
             apexBootstrapper = new ApexBootstrapper(url, path, localMetaFile, args, log, errorLog);
             if(frame) {
