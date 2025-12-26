@@ -69,7 +69,9 @@ public class ApexBootstrapper implements Bootstrapper {
         }
 
         this.localMetaDataFile = localMetaDataFile;
-        log("Found local meta data...");
+        if(localMetaDataFile!=null&&localMetaDataFile.exists()) {
+            log("Found local meta data...");
+        }
         this.localMetaData = getLocalMetaData();
 
         if (localMetaData.has("installedVersion")) {
@@ -117,6 +119,24 @@ public class ApexBootstrapper implements Bootstrapper {
             log("No download URL found for latest version. Reverting to current version.");
             latestVersion = currentVersion;
             forceUpdate = false;
+        }
+
+        if(offline && !localMetaDataFile.exists()) {
+            if(Desktop.isDesktopSupported()) {
+                Main.initLookAndFeel();
+                JDialog errorDialog = new JDialog();
+                errorDialog.setTitle("Apex Bootstrapper - Error");
+                errorDialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                JLabel messageLabel = new JLabel("<html><body style='width: 300px; padding: 10px;'>The local meta data file does not exist. An internet connection is required for the first launch.</body></html>");
+                messageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+                errorDialog.getContentPane().add(messageLabel, BorderLayout.CENTER);
+                errorDialog.setSize(350, 150);
+                errorDialog.setResizable(false);
+                errorDialog.setLocationRelativeTo(null);
+                errorDialog.setModal(true);
+                errorDialog.setVisible(true);
+            }
+            throw new RuntimeException("The local meta data file does not exist. An internet connection is required for the first launch.");
         }
 
         System.gc();

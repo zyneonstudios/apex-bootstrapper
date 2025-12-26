@@ -24,23 +24,22 @@ public class Main {
         }
 
         if(url != null && !url.isEmpty() && localMetaFile != null) {
-            apexBootstrapper = new ApexBootstrapper(url, path, localMetaFile, args, log, errorLog);
-            if(frame) {
-                try {
-                    FlatDarkLaf.setup();
-                    if(System.getProperty("os.name").toLowerCase().contains("mac")) {
-                        UIManager.setLookAndFeel(new FlatMacDarkLaf());
-                    } else {
-                        UIManager.setLookAndFeel(new FlatDarkLaf());
-                    }
-                } catch (Exception ignore) {}
-                apexBootstrapper.showFrame();
+            try {
+                apexBootstrapper = new ApexBootstrapper(url, path, localMetaFile, args, log, errorLog);
+                if (frame) {
+                    initLookAndFeel();
+                    apexBootstrapper.showFrame();
+                }
+                apexBootstrapper.update();
+                apexBootstrapper.hideFrame();
+                apexBootstrapper.launch();
+            } catch (Exception ex) {
+                System.err.println("Failed to initialize bootstrapper: "+ex.getMessage());
+                System.exit(1);
             }
-            apexBootstrapper.update();
-            apexBootstrapper.hideFrame();
-            apexBootstrapper.launch();
         } else {
-            throw new RuntimeException("Please specify a valid URL and path to a local meta file. Launch with --help for more information.");
+            System.err.println("Please specify a valid URL and path to a local meta file. Launch with --help for more information.");
+            System.exit(1);
         }
     }
 
@@ -94,5 +93,16 @@ public class Main {
 
     public static ApexBootstrapper getApexBootstrapper() {
         return apexBootstrapper;
+    }
+
+    public static void initLookAndFeel() {
+        try {
+            FlatDarkLaf.setup();
+            if(System.getProperty("os.name").toLowerCase().contains("mac")) {
+                UIManager.setLookAndFeel(new FlatMacDarkLaf());
+            } else {
+                UIManager.setLookAndFeel(new FlatDarkLaf());
+            }
+        } catch (Exception ignore) {}
     }
 }
