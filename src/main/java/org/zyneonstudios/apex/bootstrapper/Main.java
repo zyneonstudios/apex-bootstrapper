@@ -18,16 +18,10 @@ public class Main {
     public static void main(String[] args) {
         resolveData(args);
 
-        //Temporary fallback to Nexus App settings
-        if(url == null) {
-            initNexusApp();
-        }
-
         if(url != null && !url.isEmpty() && localMetaFile != null) {
             try {
                 apexBootstrapper = new ApexBootstrapper(url, path, localMetaFile, args, log, errorLog);
                 if (frame) {
-                    initLookAndFeel();
                     apexBootstrapper.showFrame();
                 }
                 apexBootstrapper.update();
@@ -93,16 +87,5 @@ public class Main {
 
     public static ApexBootstrapper getApexBootstrapper() {
         return apexBootstrapper;
-    }
-
-    public static void initLookAndFeel() {
-        try {
-            FlatDarkLaf.setup();
-            if(System.getProperty("os.name").toLowerCase().contains("mac")) {
-                UIManager.setLookAndFeel(new FlatMacDarkLaf());
-            } else {
-                UIManager.setLookAndFeel(new FlatDarkLaf());
-            }
-        } catch (Exception ignore) {}
     }
 }

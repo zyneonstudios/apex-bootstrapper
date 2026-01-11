@@ -1,5 +1,7 @@
 package org.zyneonstudios.apex.bootstrapper;
 
+import com.formdev.flatlaf.FlatDarkLaf;
+import com.formdev.flatlaf.themes.FlatMacDarkLaf;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
@@ -43,6 +45,14 @@ public class ApexBootstrapper implements Bootstrapper {
     }
 
     public ApexBootstrapper(String url, String path, File localMetaDataFile, String[] args, boolean outputLogs, boolean outputErrors) {
+        try {
+            FlatDarkLaf.setup();
+            if(System.getProperty("os.name").toLowerCase().contains("mac")) {
+                UIManager.setLookAndFeel(new FlatMacDarkLaf());
+            } else {
+                UIManager.setLookAndFeel(new FlatDarkLaf());
+            }
+        } catch (Exception ignore) {}
         this.outputLogs = outputLogs;
         this.outputErrors = outputErrors;
         this.args = args;
@@ -123,7 +133,6 @@ public class ApexBootstrapper implements Bootstrapper {
 
         if(offline && !localMetaDataFile.exists()) {
             if(Desktop.isDesktopSupported()) {
-                Main.initLookAndFeel();
                 JDialog errorDialog = new JDialog();
                 errorDialog.setTitle("Apex Bootstrapper - Error");
                 errorDialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);

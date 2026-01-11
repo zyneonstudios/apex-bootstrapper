@@ -6,7 +6,12 @@
 
     <groupId>org.zyneonstudios.apex</groupId>
     <artifactId>bootstrapper</artifactId>
-    <version>26.1-pre.2</version>
+    <version>26.0</version>
+
+    <properties>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
 
     <dependencies>
         <dependency>
@@ -25,9 +30,9 @@
 
     <distributionManagement>
         <repository>
-            <id>nerofy-snapshots</id>
-            <name>Nerofy Network Maven repository</name>
-            <url>https://maven.nrfy.net/snapshots</url>
+            <id>nerofy-releases</id>
+            <name>Nerofy Network Maven repository releases</name>
+            <url>https://maven.nrfy.net/releases</url>
         </repository>
     </distributionManagement>
 
